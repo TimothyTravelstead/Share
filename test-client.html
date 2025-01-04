@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Screen Sharing Client</title>
+    <style>
+        #messages {
+            width: 100%;
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f0f0f0;
+        }
+        #videoContainer {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+            border: 1px solid #ccc;
+            min-height: 300px;
+        }
+        .video-wrapper {
+            background: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+            min-height: 200px;
+        }
+        .video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .controls {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        button {
+            margin: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #f0f0f0;
+        }
+        #mediaControls {
+            display: none;
+        }
+        button.primary {
+            background: #007bff;
+            color: white;
+            border: none;
+        }
+        button.primary:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h2>WebSocket Screen Sharing Client</h2>
+    
+    <div class="controls">
+        <div id="connectionControls">
+            <label for="roomName">Room Name:</label>
+            <input type="text" id="roomName" value="testRoom">
+            <button onclick="initializeClient()" class="primary">Connect</button>
+            <button onclick="disconnectClient()">Disconnect</button>
+        </div>
+        
+        <div id="mediaControls">
+            <button id="shareScreen" class="primary">Share Screen</button>
+            <button id="shareAudio">Share Audio</button>
+            <button id="stopSharing">Stop Sharing</button>
+        </div>
+    </div>
+
+    <div id="messages"></div>
+    <div id="videoContainer"></div>
+
+    <!-- Load client.js first -->
+    <script src="client.js"></script>
+    
+    <!-- Then our page-specific script -->
+    <script>
+        let mediaClient = null;
+
+        function log(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            messageElement.textContent = typeof message === 'string' ? message : JSON.stringify(message, null, 2);
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Override console.log to also display in our messages div
+        const originalLog = console.log;
+        console.log = function() {
+            originalLog.apply(console, arguments);
+            Array.from(arguments).forEach(arg => log(arg));
+        };
+
+        function initializeClient() {
+            if (mediaClient) {
+                log('Already connected! Disconnect first.');
+                return;
+            }
+
+            const roomName = document.getElementById('roomName').value;
+            if (!roomName) {
+                alert('Room name is required!');
+                return;
+            }
+
+            try {
+                // Create new MediaClient with the room name
+                mediaClient = new MediaClient({ roomName });
+                document.getElementById('mediaControls').style.display = 'block';
+                document.getElementById('connectionControls').style.display = 'none';
+            } catch (error) {
+                log('Error initializing client: ' + error.message);
+            }
+        }
+
+        function disconnectClient() {
+            if (mediaClient) {
+                if (mediaClient.ws) {
+                    mediaClient.ws.close();
+                }
+                mediaClient.stopLocalStream();
+                mediaClient = null;
+                document.getElementById('mediaControls').style.display = 'none';
+                document.getElementById('connectionControls').style.display = 'block';
+                document.getElementById('videoContainer').innerHTML = '';
+                log('Disconnected from server');
+            }
+        }
+
+        // Add stop sharing button functionality
+        document.getElementById('stopSharing').onclick = function() {
+            if (mediaClient) {
+                mediaClient.stopLocalStream();
+                log('Stopped sharing');
+            }
+        };
+
+        // Handle page unload
+        window.onbeforeunload = function() {
+            if (mediaClient) {
+                disconnectClient();
+            }
+        };
+    </script>
+</body>
+</html>
